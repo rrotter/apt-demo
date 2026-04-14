@@ -1,0 +1,147 @@
+#!/bin/sh
+
+# For .changes format information, see:
+# https://www.debian.org/doc/debian-policy/ch-controlfields.html#debian-upload-changes-control-files-changes
+
+FORMAT=1.8
+DIST=
+FORCE=
+QUIET=
+VERBOSE=
+# set date to NOW, allow override w/ env var
+DATE=${CHANGES_DATE-$(TZ=UTC date +'%a, %d %b %Y %H:%M:%S %z')}
+
+usage () {
+  echo "$0: generate .changes files for .deb files"
+  echo
+  echo "usage:"
+  echo "  $0 -a [-f] debpkg.deb [...]"
+  echo "  $0 -d \"sid warty\" [-f] debpkg.deb [...]"
+  echo
+  echo "description:"
+  echo "  reads each .deb file supplied on command line, writes a"
+  echo "  .changes file with the same dirname and basename"
+  echo
+  echo "options:"
+  echo "  -a, --all"
+  echo "    support all distributions listed in conf/distributions"
+  echo "  -d, --distro \"<codename> ...\""
+  echo "    supply a list of one or more distros to support"
+  echo "  -f, --force"
+  echo "    ignore existing .changes file"
+  echo "  -q, --quiet"
+  echo "    don't print warnings"
+  echo "  -v, --verbose"
+  echo "    print debug info"
+  echo ""
+}
+
+onoe () {
+  echo $1 >&2
+  exit 1
+}
+
+warn () {
+  [ -n "$QUIET" ] && return
+  echo $1 >&2
+}
+
+while [ $# -gt 0 ]; do
+  case $1 in
+  -h|--help)
+    usage
+    exit
+    ;;
+  -a|--all)
+    DIST=$(grep '^Allow' conf/incoming | sed 's/^Allow: //')
+    ;;
+  -d|--distro)
+    shift
+    DIST=$1
+    ;;
+  --distro=*)
+    DIST=${1#--distro=}
+    ;;
+  -f|--force)
+    FORCE=1
+    ;;
+  -q|--quiet)
+    QUIET=1
+    ;;
+  -v|--verbose)
+    VERBOSE=1
+    ;;
+  -*)
+    echo unknown option "'$1'" >&2
+    exit 1
+    ;;
+  *)
+    break
+  esac
+  shift
+done
+
+if [ -n "$VERBOSE" ]; then
+  echo "DIST: $DIST"
+  echo "PACKAGES: $@"
+fi
+
+[ -n "$DIST" ] ||
+  onoe "must set distro with -d or -a\n'$0 -h' for usage"
+[ $# -gt 0 ] ||
+  onoe "must specify one or more .deb files to process\n'$0 -h' for usage"
+command -v dpkg-deb > /dev/null ||
+  onoe "dpkg-deb not found in path\nmaybe you need to install 'dpkg'?"
+
+while [ $# -gt 0 ]; do
+  FILE="$1"
+  DIRNAME=$(dirname "$FILE")
+  BASENAME=$(basename -s .deb "$FILE")
+  CHANGES="${DIRNAME}/${BASENAME}.changes"
+
+  if [ "$FILE" = "${FILE%.deb}" ]; then
+    warn "$FILE does not have extension '.deb', skipping"
+    shift
+    continue
+  fi
+
+  if [ -z $FORCE ]; then
+    if [ -e "$CHANGES" ]; then
+      warn "$CHANGES already exists, skipping"
+      shift
+      continue
+    fi
+  fi
+
+  NAME=$(dpkg-deb -f "$FILE" Package)
+  ARCH=$(dpkg-deb -f "$FILE" Architecture)
+  VERSION=$(dpkg-deb -f "$FILE" Version)
+  MAINTAINER=$(dpkg-deb -f "$FILE" Maintainer)
+  SECTION=$(dpkg-deb -f "$FILE" Section)
+  PRIORITY=$(dpkg-deb -f "$FILE" Priority)
+
+  SHA1=$(sha1sum "$FILE" | awk '{ print $1 }')
+  MD5=$(md5sum "$FILE" | awk '{ print $1 }')
+  SHA256=$(sha256sum "$FILE" | awk '{ print $1 }')
+  SIZE=$(wc -c "$FILE" | awk '{ print $1 }')
+
+  echo "\
+Format: $FORMAT
+Date: $DATE
+Source: $NAME
+Binary: $NAME
+Architecture: $ARCH
+Version: $VERSION
+Distribution: ${DIST}
+Maintainer: $MAINTAINER
+Changes:
+ $NAME ($VERSION) $DIST
+Checksums-Sha1:
+ $SHA1 $SIZE ${BASENAME}.deb
+Checksums-Sha256:
+ $SHA256 $SIZE ${BASENAME}.deb
+Files:
+ $MD5 $SIZE $SECTION $PRIORITY ${BASENAME}.deb" > "$CHANGES"
+
+  shift
+done

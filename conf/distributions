@@ -1,0 +1,49 @@
+Origin: demo
+Suite: bullseye
+Codename: bullseye
+Architectures: amd64 arm64
+Components: main
+Description: Packages for Debian 11 (bullseye)
+Limit: 0
+Contents:
+SignWith: default
+
+Origin: demo
+Suite: bookworm
+Codename: bookworm
+Architectures: amd64 arm64
+Components: main
+Description: Packages for Debian 12 (bookworm)
+Limit: 0
+Contents:
+SignWith: default
+
+Origin: demo
+Suite: trixie
+Codename: trixie
+Architectures: amd64 arm64
+Components: main
+Description: Packages for Debian 13 (trixie)
+Limit: 0
+Contents:
+SignWith: default
+
+Origin: demo
+Suite: jammy
+Codename: jammy
+Architectures: amd64 arm64
+Components: main
+Description: Packages for Ubuntu 22.04 (jammy)
+Limit: 0
+Contents:
+SignWith: default
+
+Origin: demo
+Suite: noble
+Codename: noble
+Architectures: amd64 arm64
+Components: main
+Description: Packages for Ubuntu 24.04 (noble)
+Limit: 0
+Contents:
+SignWith: default

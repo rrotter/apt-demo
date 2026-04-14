@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -e
+
+write_index () {
+  local CWD="${1}"
+  echo -e "---\ntitle: Index of ${CWD:-/}\n---" > index.md
+  echo "# Index of ${CWD:-/}" >> index.md
+  echo -e "\n---\n\n| Name | Size\n| --- | ---:" >> index.md
+  if [[ -n "$CWD" ]]; then
+    echo "| 📂 [..]($(dirname $CWD)/index.html) | -" >> index.md
+  fi
+  local x
+  for x in *; do
+    if [[ "$x" = index.md ]]; then
+      continue
+    elif [[ -d "$x" ]]; then
+      echo "| 📁 [$x/]($x/index.html) | -" >> index.md
+      pushd "$x"
+      write_index "$CWD/$x"
+      popd
+    else
+      echo "| 📄 [$x]($x) | $(command ls -lh "$x" | awk '{ print $5 }')" >> index.md
+    fi
+  done
+  echo -e "\n---\n" >> index.md
+  echo "_[Fork me on GitHub](https://github.com/orgname/reponame) --- [example.com](/)_" >> index.md
+}
+
+if [[ -d "$1" ]]; then
+  cd "$1"
+else
+  echo "usage: $0 dir" >&2
+  exit 1
+fi
+
+write_index

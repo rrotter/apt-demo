@@ -1,0 +1,6 @@
+Name: default
+IncomingDir: incoming
+TempDir: tmp
+Allow: bullseye bookworm trixie jammy noble
+Options: multiple_distributions
+Permit: older_version

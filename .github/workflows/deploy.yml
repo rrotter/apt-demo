@@ -1,0 +1,83 @@
+---
+on:
+  push:
+    # branches: [main]
+
+env:
+  REPREPRO_VERSION: "8aff15851a4cc48423e0142a65fa34131e7b78ea" # tag reprepro-5.4.8
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install reprepro dependencies
+        # build-only dependencies included unconditionally because they are mostly pre-installed in the runner image anyway
+        run: |
+          sudo rm -f /var/lib/man-db/auto-update
+          sudo apt-get --no-install-recommends install -y git ca-certificates build-essential libarchive-dev libdb-dev libgpg-error-dev libgpgme-dev autoconf automake zstd
+      - name: Get OS version
+        id: version
+        run: . /etc/os-release && echo "os=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+      - name: Ensure reprepro install dirs are writable
+        run: |
+          sudo mkdir -p /usr/local/bin /usr/local/share/man/man1
+          sudo chmod go+rw /usr/local/bin /usr/local/share/man/man1
+      - name: Cache reprepro
+        id: cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            /usr/local/bin/changestool
+            /usr/local/bin/reprepro
+            /usr/local/bin/rredtool
+            /usr/local/share/man/man1/changestool.1
+            /usr/local/share/man/man1/reprepro.1
+            /usr/local/share/man/man1/rredtool.1
+          key: ${{ steps.version.outputs.os }}-${{ runner.arch }}-reprepro-${{ env.REPREPRO_VERSION }}
+      - name: Checkout reprepro
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: git clone https://salsa.debian.org/debian/reprepro && cd reprepro && git checkout "$REPREPRO_VERSION"
+      - name: Build reprepro
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd reprepro && ./autogen.sh && ./configure && make && make install
+          cd - && rm -rf reprepro
+      - run: reprepro --version
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          lfs: true
+      - name: Configure gpg
+        run: echo -e "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+      - name: Build apt repo
+        run: |
+          mkdir -p apt/dists/
+          reprepro -V --outdir ./apt processincoming default
+          gpg --armor --export > apt/keyring.asc
+          gpg --export > apt/keyring.gpg
+      - name: Generate directory listing
+        run: ./bin/index ./apt
+      - name: Setup Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1.0.13
+        with:
+          source: ./apt/
+          destination: ./apt/_site
+      - name: Upload artifact
+        id: artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ./apt/_site
+
+  # # Deployment job
+  # deploy:
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
+  #   runs-on: ubuntu-latest
+  #   needs: artifact
+  #   steps:
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 v5.0.0
