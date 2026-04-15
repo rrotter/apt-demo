@@ -8,7 +8,11 @@ write_index () {
   echo "# Index of ${CWD:-/}" >> index.md
   echo -e "\n---\n\n| Name | Size\n| --- | ---:" >> index.md
   if [[ -n "$CWD" ]]; then
-    echo "| 📂 [..]($(dirname $CWD)/index.html) | -" >> index.md
+    PARENT=$(dirname $CWD)
+    if [[ "$PARENT" = "/" ]]; then
+      PARENT=
+    fi
+    echo "| 📂 [..]($PARENT/index.html) | -" >> index.md
   fi
   local x
   for x in *; do
@@ -19,6 +23,9 @@ write_index () {
       pushd "$x"
       write_index "$CWD/$x"
       popd
+    elif [[ "$x" = *.md ]]; then
+      x="${x%.md}"
+      echo "| 📄 [$x]($x.html) | -" >> index.md
     else
       echo "| 📄 [$x]($x) | $(command ls -lh "$x" | awk '{ print $5 }')" >> index.md
     fi
